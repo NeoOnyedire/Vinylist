@@ -1,99 +1,107 @@
-# Vinylist
+# Vinylist (Vercel edition)
 
-Log every album you listen to, rate it, and see your all-time ranking — Letterboxd, for music. Sign in with Spotify, search the catalog, rate albums (0.5–5 in half steps), write short reviews, and get an automatically sorted ranked list on your profile.
+Same app — log albums, rate 0.5–5, get an auto-sorted ranking — restructured to deploy entirely on Vercel:
 
-## Stack
+- **Frontend:** React + Vite + Tailwind, built as a static site
+- **Backend:** one serverless function per API route under `api/`, same domain as the frontend (no CORS needed)
+- **Database:** Postgres (works with Vercel Postgres, [Neon](https://neon.tech), or [Supabase](https://supabase.com) — anything that gives you a connection string)
 
-- **Backend:** Node.js + Express + SQLite (`better-sqlite3`, a single local file, no external DB to set up)
-- **Frontend:** React + Vite + Tailwind
-- **Auth:** Spotify OAuth (Authorization Code flow) → the app issues its own JWT session token
+SQLite doesn't work on Vercel (functions have no persistent disk), so storage moved to hosted Postgres. Everything else — routes, auth flow, rating logic — is unchanged from the Express version.
 
-## 1. Create a Spotify app
+## 1. Create a Postgres database
 
-1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) and log in.
-2. Click **Create app**.
-3. Fill in a name/description (anything works).
-4. Under **Redirect URIs**, add exactly:
+Pick one (all have a free tier):
+- **Vercel Postgres:** in your Vercel project → Storage tab → Create Database → Postgres. It auto-adds a `POSTGRES_URL` env var to your project.
+- **Neon / Supabase:** create a project on their site, copy the connection string they give you.
+
+Either way, you end up with a connection string like `postgres://user:pass@host/dbname?sslmode=require`.
+
+## 2. Create a Spotify app
+
+1. [Spotify Developer Dashboard](https://developer.spotify.com/dashboard) → **Create app**.
+2. Add a Redirect URI — you'll set the real one after your first deploy gives you a domain, e.g.:
    ```
-   http://127.0.0.1:5000/api/auth/callback
+   https://your-app.vercel.app/api/auth/callback
    ```
-5. Save, then open the app's **Settings** to copy your **Client ID** and **Client Secret**.
+   (You can add `http://127.0.0.1:3000/api/auth/callback` too, for local testing with `vercel dev`.)
+3. Copy the **Client ID** and **Client Secret**.
 
-## 2. Backend setup
+## 3. Deploy
 
 ```bash
-cd backend
-cp .env.example .env
+npm install -g vercel   # if you don't have it
+cd vinylist-vercel
+vercel                  # follow the prompts, links this folder to a Vercel project
 ```
 
-Open `.env` and fill in:
-- `SPOTIFY_CLIENT_ID` / `SPOTIFY_CLIENT_SECRET` — from step 1
-- `JWT_SECRET` — any long random string (e.g. run `openssl rand -hex 32`)
-- Leave the rest as-is for local dev
+Then in the Vercel dashboard → your project → **Settings → Environment Variables**, add:
 
-Install and run:
+| Variable | Value |
+|---|---|
+| `POSTGRES_URL` | your connection string from step 1 (skip if you used Vercel Postgres — it's already set) |
+| `SPOTIFY_CLIENT_ID` | from step 2 |
+| `SPOTIFY_CLIENT_SECRET` | from step 2 |
+| `SPOTIFY_REDIRECT_URI` | `https://your-app.vercel.app/api/auth/callback` |
+| `FRONTEND_URL` | `https://your-app.vercel.app` |
+| `JWT_SECRET` | any long random string (`openssl rand -hex 32`) |
+
+Redeploy so the new env vars take effect:
+
+```bash
+vercel --prod
+```
+
+Go back to the Spotify dashboard and make sure the Redirect URI there **exactly** matches `SPOTIFY_REDIRECT_URI`.
+
+## 4. Run the migration (one time)
+
+The tables aren't created automatically (running `CREATE TABLE` on every cold start would be wasteful) — run it once yourself:
+
+```bash
+vercel env pull .env        # pulls your Vercel env vars into a local .env file
+npm run migrate
+```
+
+That creates `users`, `albums`, and `reviews`. Re-running it later is safe (it's all `IF NOT EXISTS`).
+
+## Local development
 
 ```bash
 npm install
-npm run dev
+vercel dev
 ```
 
-The API starts on `http://127.0.0.1:5000` and creates `vinylist.db` automatically on first run.
-
-## 3. Frontend setup
-
-In a new terminal:
-
-```bash
-cd frontend
-cp .env.example .env
-npm install
-npm run dev
-```
-
-Open `http://127.0.0.1:5173`. Click **Continue with Spotify**, log in, and you're in.
-
-## How it works
-
-- **Login:** `/api/auth/login` redirects to Spotify's consent screen → Spotify calls back to `/api/auth/callback` → the backend exchanges the code for a token, fetches the user's Spotify profile, upserts a local `users` row, and signs a 30-day JWT → the frontend stores that JWT in `localStorage` and sends it as `Authorization: Bearer <token>` on every API call.
-- **Search:** uses Spotify's Client Credentials flow (app-level, no user token needed) to query the full Spotify album catalog.
-- **Reviews:** one review per user per album (rating + optional text), stored locally. Saving an album's first review caches its Spotify metadata (name, artist, cover, release date) in the local `albums` table so your ranked list loads instantly without re-hitting Spotify.
-- **Ranking:** your profile page sorts all your reviews by rating (highest first, ties broken by most recently updated) and numbers them — that's your all-time ranking. No manual drag-and-drop needed; re-rate an album and it re-sorts itself.
+`vercel dev` serves the frontend **and** the `api/` functions together on `http://localhost:3000`, exactly like production — plain `vite dev` alone won't run the API routes.
 
 ## Project structure
 
 ```
-vinylist/
-├── backend/
-│   ├── server.js          # Express app entrypoint
-│   ├── db.js               # SQLite schema (users, albums, reviews)
-│   ├── spotify.js          # Spotify catalog search / album lookup helpers
-│   ├── middleware/auth.js  # JWT verification
-│   └── routes/
-│       ├── auth.js         # OAuth login/callback
-│       ├── albums.js       # search + album detail
-│       ├── reviews.js      # create/update/delete a review, "my ranking"
-│       └── users.js        # profile + public ranked list by user id
-└── frontend/
-    └── src/
-        ├── api.js                    # fetch wrapper, token storage
-        ├── App.jsx                   # routes + auth guard
-        ├── components/
-        │   ├── Navbar.jsx
-        │   ├── AlbumCard.jsx
-        │   └── GrooveRating.jsx      # the 0.5–5 vinyl-record rating control
-        └── pages/
-            ├── Login.jsx
-            ├── Callback.jsx
-            ├── Dashboard.jsx         # search
-            ├── AlbumDetail.jsx       # rate + review
-            └── Profile.jsx           # your ranked list
+vinylist-vercel/
+├── api/
+│   ├── _lib/
+│   │   ├── db.js        # Postgres pool (reused across warm invocations)
+│   │   ├── auth.js       # JWT verification
+│   │   └── spotify.js    # Spotify catalog search / album lookup
+│   ├── auth/
+│   │   ├── login.js      # GET  /api/auth/login
+│   │   └── callback.js   # GET  /api/auth/callback
+│   ├── albums/
+│   │   ├── search.js     # GET  /api/albums/search?q=
+│   │   └── [id].js       # GET  /api/albums/:id
+│   ├── reviews/
+│   │   ├── index.js      # POST /api/reviews
+│   │   ├── me.js          # GET  /api/reviews/me
+│   │   └── [albumId].js   # DELETE /api/reviews/:albumId
+│   └── users/
+│       ├── me.js           # GET /api/users/me
+│       └── [id].js         # GET /api/users/:id
+├── scripts/migrate.js       # one-time schema setup
+├── src/                      # same React app as before, api.js now calls same-origin /api/*
+└── vercel.json               # SPA fallback so client-side routes survive a refresh
 ```
 
-## Where to take it next
+## Things to know about this setup
 
-A few natural next steps once this is running:
-- **Public profiles:** the `GET /api/users/:id` endpoint already returns any user's public ranked list — add a route like `/u/:id` on the frontend to view friends' rankings.
-- **Follow/feed:** a `follows` table + a feed endpoint would let people see friends' latest reviews.
-- **Genres/years filters:** the `albums` table has `release_date`; adding a `genres` column (Spotify's artist endpoint has genre data) would enable filtering your ranking.
-- **Deploying:** swap SQLite for Postgres if you outgrow a single file (the queries are plain SQL, easy to port), and set `SPOTIFY_REDIRECT_URI` / `FRONTEND_URL` to your real domains plus HTTPS.
+- **Same-origin, no CORS:** the frontend calls relative `/api/...` paths, so it only works when frontend and API are deployed together like this. If you ever split them onto different domains, you'll need to reintroduce CORS headers.
+- **Spotify token caching is per-function:** each `api/*.js` file is bundled as its own Lambda, so the in-memory Spotify app-token cache in `_lib/spotify.js` isn't shared between e.g. `albums/search.js` and `albums/[id].js`. Harmless — it just means slightly more token fetches than a single long-running server — but worth knowing if you're optimizing.
+- **Connection pooling:** `pg`'s `Pool` is capped at 3 connections per function instance to avoid exhausting your database's connection limit under concurrent serverless invocations. If you outgrow that, look at a pooler like PgBouncer or Neon's built-in pooled connection string.
