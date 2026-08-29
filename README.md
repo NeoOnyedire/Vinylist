@@ -8,7 +8,7 @@ Same app — log albums, rate 0.5–5, get an auto-sorted ranking — restructur
 
 SQLite doesn't work on Vercel (functions have no persistent disk), so storage moved to hosted Postgres. Everything else — routes, auth flow, rating logic — is unchanged from the Express version.
 
-## 01. Create a Postgres database
+## 1. Create a Postgres database
 
 Pick one (all have a free tier):
 - **Vercel Postgres:** in your Vercel project → Storage tab → Create Database → Postgres. It auto-adds a `POSTGRES_URL` env var to your project.
