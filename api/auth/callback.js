@@ -23,13 +23,19 @@ module.exports = async function handler(req, res) {
         client_secret: process.env.SPOTIFY_CLIENT_SECRET,
       }),
     });
-    if (!tokenResp.ok) throw new Error('Token exchange failed');
+    if (!tokenResp.ok) {
+      const body = await tokenResp.text();
+      throw new Error(`Token exchange failed (${tokenResp.status}): ${body}`);
+    }
     const tokenData = await tokenResp.json();
 
     const profileResp = await fetch('https://api.spotify.com/v1/me', {
       headers: { Authorization: `Bearer ${tokenData.access_token}` },
     });
-    if (!profileResp.ok) throw new Error('Profile fetch failed');
+    if (!profileResp.ok) {
+      const body = await profileResp.text();
+      throw new Error(`Profile fetch failed (${profileResp.status}): ${body}`);
+    }
     const profile = await profileResp.json();
 
     const avatar = profile.images && profile.images[0] ? profile.images[0].url : null;
