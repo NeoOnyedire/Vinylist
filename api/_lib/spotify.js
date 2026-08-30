@@ -38,6 +38,8 @@ async function searchAlbums(query, limit = 12) {
     query
   )}&type=album&limit=${limit}`;
 
+  console.log('Spotify search URL:', url, '| token present:', !!token, '| token length:', token && token.length);
+
   const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!resp.ok) {
     const body = await resp.text();
