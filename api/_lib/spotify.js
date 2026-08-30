@@ -1,44 +1,12 @@
-// Cached at module scope - persists across warm invocations of whichever
-// function required this file, refetched automatically on cold starts.
-let cachedToken = null;
-let cachedTokenExpiry = 0;
+// Callers pass in a valid token (a per-user token from _lib/spotifyAuth.js) -
+// this module no longer manages its own Client Credentials token, since
+// Spotify's Feb 2026 Developer Mode changes restrict catalog/search access
+// for that flow on newly-created apps.
 
-async function getAppToken() {
-  if (cachedToken && Date.now() < cachedTokenExpiry) {
-    return cachedToken;
-  }
-
-  const basic = Buffer.from(
-    `${process.env.SPOTIFY_CLIENT_ID}:${process.env.SPOTIFY_CLIENT_SECRET}`
-  ).toString('base64');
-
-  const resp = await fetch('https://accounts.spotify.com/api/token', {
-    method: 'POST',
-    headers: {
-      Authorization: `Basic ${basic}`,
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body: 'grant_type=client_credentials',
-  });
-
-  if (!resp.ok) {
-    const body = await resp.text();
-    throw new Error(`Spotify token request failed (${resp.status}): ${body}`);
-  }
-
-  const data = await resp.json();
-  cachedToken = data.access_token;
-  cachedTokenExpiry = Date.now() + (data.expires_in - 60) * 1000;
-  return cachedToken;
-}
-
-async function searchAlbums(query, limit = 12) {
-  const token = await getAppToken();
+async function searchAlbums(token, searchQuery, limit = 12) {
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(
-    query
+    searchQuery
   )}&type=album&limit=${limit}`;
-
-  console.log('Spotify search URL:', url, '| token present:', !!token, '| token length:', token && token.length);
 
   const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!resp.ok) {
@@ -50,8 +18,7 @@ async function searchAlbums(query, limit = 12) {
   return data.albums.items.map(formatAlbum);
 }
 
-async function getAlbum(albumId) {
-  const token = await getAppToken();
+async function getAlbum(token, albumId) {
   const resp = await fetch(`https://api.spotify.com/v1/albums/${albumId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
@@ -74,4 +41,4 @@ function formatAlbum(a) {
   };
 }
 
-module.exports = { getAppToken, searchAlbums, getAlbum };
+module.exports = { searchAlbums, getAlbum };
