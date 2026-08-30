@@ -1,5 +1,6 @@
 const { query } = require('../_lib/db');
 const { requireAuth } = require('../_lib/auth');
+const { getValidUserToken } = require('../_lib/spotifyAuth');
 const { getAlbum } = require('../_lib/spotify');
 
 module.exports = async function handler(req, res) {
@@ -14,7 +15,8 @@ module.exports = async function handler(req, res) {
     let album = rows[0];
 
     if (!album) {
-      album = await getAlbum(id);
+      const token = await getValidUserToken(user.id);
+      album = await getAlbum(token, id);
       await query(
         `INSERT INTO albums (id, name, artist, image_url, release_date, spotify_url)
          VALUES ($1, $2, $3, $4, $5, $6)`,
