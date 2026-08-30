@@ -1,12 +1,13 @@
 const { query } = require('../_lib/db');
 const { requireAuth } = require('../_lib/auth');
+const { getValidUserToken } = require('../_lib/spotifyAuth');
 const { getAlbum } = require('../_lib/spotify');
 
-async function ensureAlbumCached(albumId) {
+async function ensureAlbumCached(albumId, token) {
   const { rows } = await query('SELECT id FROM albums WHERE id = $1', [albumId]);
   if (rows.length) return;
 
-  const album = await getAlbum(albumId);
+  const album = await getAlbum(token, albumId);
   await query(
     `INSERT INTO albums (id, name, artist, image_url, release_date, spotify_url)
      VALUES ($1, $2, $3, $4, $5, $6)
@@ -27,7 +28,8 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    await ensureAlbumCached(album_id);
+    const token = await getValidUserToken(user.id);
+    await ensureAlbumCached(album_id, token);
 
     const { rows } = await query(
       `INSERT INTO reviews (user_id, album_id, rating, review_text, listened_at)
