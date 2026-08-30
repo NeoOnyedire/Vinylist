@@ -39,15 +39,27 @@ module.exports = async function handler(req, res) {
     const profile = await profileResp.json();
 
     const avatar = profile.images && profile.images[0] ? profile.images[0].url : null;
+    const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
 
     await query(
-      `INSERT INTO users (id, display_name, email, avatar_url)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO users (id, display_name, email, avatar_url, spotify_access_token, spotify_refresh_token, spotify_token_expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        ON CONFLICT (id) DO UPDATE SET
          display_name = EXCLUDED.display_name,
          email = EXCLUDED.email,
-         avatar_url = EXCLUDED.avatar_url`,
-      [profile.id, profile.display_name || profile.id, profile.email, avatar]
+         avatar_url = EXCLUDED.avatar_url,
+         spotify_access_token = EXCLUDED.spotify_access_token,
+         spotify_refresh_token = EXCLUDED.spotify_refresh_token,
+         spotify_token_expires_at = EXCLUDED.spotify_token_expires_at`,
+      [
+        profile.id,
+        profile.display_name || profile.id,
+        profile.email,
+        avatar,
+        tokenData.access_token,
+        tokenData.refresh_token,
+        expiresAt,
+      ]
     );
 
     const sessionToken = signSession({
