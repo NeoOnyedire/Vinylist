@@ -1,9 +1,9 @@
-// Callers pass in a valid token (a per-user token from _lib/spotifyAuth.js) -
-// this module no longer manages its own Client Credentials token, since
-// Spotify's Feb 2026 Developer Mode changes restrict catalog/search access
-// for that flow on newly-created apps.
+// Callers pass in a valid token (a per-user token from _lib/spotifyAuth.js).
+// Note: Spotify's Feb 2026 Development Mode changes cap /v1/search at a
+// maximum of 10 results per request (previously up to 50) - requesting more
+// throws a 400 "Invalid limit" error, which is why the default below is 10.
 
-async function searchAlbums(token, searchQuery, limit = 12) {
+async function searchAlbums(token, searchQuery, limit = 10) {
   const url = `https://api.spotify.com/v1/search?q=${encodeURIComponent(
     searchQuery
   )}&type=album&limit=${limit}`;
