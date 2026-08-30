@@ -22,7 +22,8 @@ async function getAppToken() {
   });
 
   if (!resp.ok) {
-    throw new Error(`Spotify token request failed: ${resp.status}`);
+    const body = await resp.text();
+    throw new Error(`Spotify token request failed (${resp.status}): ${body}`);
   }
 
   const data = await resp.json();
@@ -38,7 +39,10 @@ async function searchAlbums(query, limit = 12) {
   )}&type=album&limit=${limit}`;
 
   const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
-  if (!resp.ok) throw new Error(`Spotify search failed: ${resp.status}`);
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Spotify search failed (${resp.status}): ${body}`);
+  }
 
   const data = await resp.json();
   return data.albums.items.map(formatAlbum);
@@ -49,7 +53,10 @@ async function getAlbum(albumId) {
   const resp = await fetch(`https://api.spotify.com/v1/albums/${albumId}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!resp.ok) throw new Error(`Spotify album lookup failed: ${resp.status}`);
+  if (!resp.ok) {
+    const body = await resp.text();
+    throw new Error(`Spotify album lookup failed (${resp.status}): ${body}`);
+  }
 
   return formatAlbum(await resp.json());
 }
