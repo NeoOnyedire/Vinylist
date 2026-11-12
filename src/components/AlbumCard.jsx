@@ -4,36 +4,39 @@ export default function AlbumCard({ album, rank, rating }) {
   return (
     <Link
       to={`/album/${album.id}`}
-      className="group flex gap-4 items-center p-3 rounded-lg hover:bg-surface transition-colors"
+      className="group flex items-center gap-3 rounded-2xl border border-groove bg-surface/70 p-3 text-left transition hover:-translate-y-0.5 hover:border-label hover:bg-surface sm:gap-4"
     >
-      {rank && (
-        <span className="font-display text-2xl text-dim w-8 text-right flex-shrink-0">
+      {typeof rank === 'number' && (
+        <span className="w-8 flex-shrink-0 text-right font-display text-2xl text-dim">
           {rank}
         </span>
       )}
-      <div className="w-16 h-16 rounded overflow-hidden bg-surface2 flex-shrink-0">
+
+      <div className="h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-surface2 ring-1 ring-white/5 sm:h-20 sm:w-20">
         {album.image_url ? (
           <img
             src={album.image_url}
             alt={`${album.name} cover`}
-            className="w-full h-full object-cover"
+            className="h-full w-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center text-dim text-xs">
+          <div className="flex h-full w-full items-center justify-center text-[10px] text-dim">
             No cover
           </div>
         )}
       </div>
+
       <div className="min-w-0 flex-1">
-        <p className="font-medium text-cream truncate group-hover:text-label transition-colors">
+        <p className="truncate text-base font-medium text-cream transition group-hover:text-label">
           {album.name}
         </p>
-        <p className="text-sm text-dim truncate">{album.artist}</p>
+        <p className="truncate text-sm text-dim">{album.artist}</p>
       </div>
+
       {typeof rating === 'number' && (
-        <span className="text-label font-display text-lg flex-shrink-0">
+        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-label/15 text-sm font-semibold text-label">
           {rating.toFixed(1)}
-        </span>
+        </div>
       )}
     </Link>
   );

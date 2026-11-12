@@ -11,28 +11,33 @@ export default function Navbar() {
   }
 
   return (
-    <header className="border-b border-groove">
-      <div className="max-w-5xl mx-auto flex items-center justify-between px-6 py-4">
-        <Link to="/" className="flex items-center gap-2">
-          <span className="w-6 h-6 rounded-full border-2 border-label relative flex-shrink-0">
+    <header className="sticky top-0 z-30 border-b border-groove/80 bg-ink/80 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8">
+        <Link to="/" className="flex items-center gap-2.5" aria-label="Vinylist home">
+          <span className="relative h-7 w-7 flex-shrink-0 rounded-full border-2 border-label bg-surface">
             <span className="absolute inset-[6px] rounded-full bg-label" />
           </span>
-          <span className="font-display text-xl tracking-tight text-cream">
-            Vinylist
-          </span>
+          <span className="font-display text-xl tracking-tight text-cream">Vinylist</span>
         </Link>
 
         {loggedIn ? (
-          <nav className="flex items-center gap-6 text-sm">
-            <Link to="/" className="text-dim hover:text-cream transition-colors">
+          <nav className="flex items-center gap-1.5 sm:gap-2">
+            <Link
+              to="/"
+              className="rounded-full border border-groove bg-surface/80 px-3 py-1.5 text-xs font-medium text-dim transition hover:border-label hover:text-cream sm:text-sm"
+            >
               Search
             </Link>
-            <Link to="/profile" className="text-dim hover:text-cream transition-colors">
+            <Link
+              to="/profile"
+              className="rounded-full border border-groove bg-surface/80 px-3 py-1.5 text-xs font-medium text-dim transition hover:border-label hover:text-cream sm:text-sm"
+            >
               My rankings
             </Link>
             <button
+              type="button"
               onClick={handleLogout}
-              className="text-dim hover:text-label transition-colors"
+              className="rounded-full border border-groove bg-transparent px-3 py-1.5 text-xs font-medium text-dim transition hover:border-label hover:text-label sm:text-sm"
             >
               Log out
             </button>
@@ -40,7 +45,7 @@ export default function Navbar() {
         ) : (
           <Link
             to="/login"
-            className="text-sm px-4 py-2 rounded-full bg-label text-ink font-medium hover:brightness-110 transition"
+            className="rounded-full bg-label px-4 py-2 text-sm font-semibold text-ink transition hover:brightness-110"
           >
             Log in
           </Link>
