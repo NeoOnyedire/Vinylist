@@ -1,4 +1,4 @@
-// Run once, locally, against your hosted Postgres database:
+// Run locally against your hosted Postgres database after deploying schema changes:
 //   POSTGRES_URL="postgres://..." npm run migrate
 // (or `vercel env pull` first to load it from your Vercel project's env vars)
 require('dotenv').config();
@@ -23,6 +23,11 @@ const schema = `
     avatar_url TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
   );
+
+  ALTER TABLE users
+    ADD COLUMN IF NOT EXISTS spotify_access_token TEXT,
+    ADD COLUMN IF NOT EXISTS spotify_refresh_token TEXT,
+    ADD COLUMN IF NOT EXISTS spotify_token_expires_at TIMESTAMPTZ;
 
   CREATE TABLE IF NOT EXISTS albums (
     id TEXT PRIMARY KEY,
