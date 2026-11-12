@@ -58,9 +58,13 @@ Go back to the Spotify dashboard and make sure the Redirect URI there **exactly*
 The tables aren't created automatically (running schema changes on every cold start would be wasteful) — run the migration yourself:
 
 ```bash
+vercel link               # only needed if this folder is not linked yet
 vercel env pull .env        # pulls your Vercel env vars into a local .env file
+npm ci                     # install the project's locked dependencies
 npm run migrate
 ```
+
+When prompted by `vercel link`, select the team and project where Vinylist is deployed. If the Vercel CLI asks to upgrade, declining is fine; the upgrade is not required for these commands.
 
 That creates `users`, `albums`, and `reviews`, and adds any columns required by newer app versions. Re-running it is safe. Run it again after deploying schema updates. If you already have an account, sign out and sign back in after running the migration so Vinylist can save your Spotify tokens for catalog search.
 
