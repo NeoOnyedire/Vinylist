@@ -43,29 +43,47 @@ export default function AlbumDetail() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    load();
+    let active = true;
+    setAlbum(null);
+    load(() => active);
+    return () => {
+      active = false;
+    };
   }, [id]);
 
-  async function load() {
-    const data = await api.getAlbum(id);
-    setAlbum(data);
+  async function load(isActive = () => true) {
+    setLoading(true);
+    setError('');
 
-    if (data?.myReview) {
-      const reviewMetrics = parseMetrics(data.myReview.metrics);
-      const avg = averageMetrics(reviewMetrics);
-      const hasOverride = data.myReview.override_overall || Math.abs(Number(data.myReview.rating) - avg) > 0.1;
+    try {
+      const data = await api.getAlbum(id);
+      if (!data) throw new Error('Album response was empty');
+      if (!isActive()) return;
 
-      setMetrics(reviewMetrics);
-      setOverallRating(hasOverride ? Number(data.myReview.rating) || avg : avg);
-      setOverrideOverall(hasOverride);
-      setReviewText(data.myReview.review_text || '');
-    } else {
-      setMetrics(DEFAULT_METRICS);
-      setOverallRating(0);
-      setOverrideOverall(false);
-      setReviewText('');
+      setAlbum(data);
+      if (data.myReview) {
+        const reviewMetrics = parseMetrics(data.myReview.metrics);
+        const avg = averageMetrics(reviewMetrics);
+        const hasOverride = data.myReview.override_overall || Math.abs(Number(data.myReview.rating) - avg) > 0.1;
+
+        setMetrics(reviewMetrics);
+        setOverallRating(hasOverride ? Number(data.myReview.rating) || avg : avg);
+        setOverrideOverall(hasOverride);
+        setReviewText(data.myReview.review_text || '');
+      } else {
+        setMetrics(DEFAULT_METRICS);
+        setOverallRating(0);
+        setOverrideOverall(false);
+        setReviewText('');
+      }
+    } catch (err) {
+      console.error(err);
+      if (isActive()) setError('Could not load this album. Please try again.');
+    } finally {
+      if (isActive()) setLoading(false);
     }
   }
 
@@ -119,8 +137,23 @@ export default function AlbumDetail() {
     }
   }
 
-  if (!album) {
+  if (!album && loading) {
     return <div className="mx-auto max-w-2xl py-10 text-sm text-dim">Loading album…</div>;
+  }
+
+  if (!album) {
+    return (
+      <div className="mx-auto max-w-2xl py-10">
+        <p className="text-sm text-red-200">{error || 'Could not load this album.'}</p>
+        <button
+          type="button"
+          onClick={() => load()}
+          className="mt-4 rounded-xl border border-groove px-4 py-2 text-sm text-cream transition hover:border-label"
+        >
+          Try again
+        </button>
+      </div>
+    );
   }
 
   const avg = album.stats && album.stats.avg_rating;
@@ -133,6 +166,12 @@ export default function AlbumDetail() {
         <span aria-hidden="true">←</span>
         Back to search
       </Link>
+
+      {error && (
+        <div className="mt-4 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          {error}
+        </div>
+      )}
 
       <div className="mt-5 flex flex-col gap-5 rounded-3xl border border-groove bg-surface/70 p-4 sm:flex-row sm:p-6">
         <div className="h-40 w-full overflow-hidden rounded-2xl bg-surface2 ring-1 ring-white/5 sm:h-48 sm:w-48">
