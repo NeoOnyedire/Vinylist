@@ -27,7 +27,8 @@ async function getAlbum(token, albumId) {
     throw new Error(`Spotify album lookup failed (${resp.status}): ${body}`);
   }
 
-  return formatAlbum(await resp.json());
+  const album = await resp.json();
+  return formatAlbum(album);
 }
 
 function formatAlbum(a) {
@@ -38,6 +39,13 @@ function formatAlbum(a) {
     image_url: a.images && a.images[0] ? a.images[0].url : null,
     release_date: a.release_date,
     spotify_url: a.external_urls ? a.external_urls.spotify : null,
+    tracks: (a.tracks && a.tracks.items ? a.tracks.items : []).map((track) => ({
+      id: track.id,
+      name: track.name,
+      duration_ms: track.duration_ms,
+      track_number: track.track_number,
+      preview_url: track.preview_url,
+    })),
   };
 }
 

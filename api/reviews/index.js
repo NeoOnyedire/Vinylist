@@ -16,14 +16,36 @@ async function ensureAlbumCached(albumId, token) {
   );
 }
 
+function normalizeMetrics(metrics) {
+  const defaults = { relatability: 0, production: 0, replayability: 0 };
+  if (!metrics || typeof metrics !== 'object') return defaults;
+
+  const normalized = { ...defaults };
+  for (const key of Object.keys(defaults)) {
+    const value = Number(metrics[key]);
+    normalized[key] = Number.isFinite(value) ? value : 0;
+  }
+
+  return normalized;
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).end();
   const user = requireAuth(req, res);
   if (!user) return;
 
-  const { album_id, rating, review_text, listened_at } = req.body || {};
+  const { album_id, rating, review_text, listened_at, metrics, overrideOverall } = req.body || {};
+  const normalizedMetrics = normalizeMetrics(metrics);
+  const metricValues = Object.values(normalizedMetrics).filter((value) => Number.isFinite(value));
+  const averageMetricScore = metricValues.length
+    ? metricValues.reduce((sum, value) => sum + value, 0) / metricValues.length
+    : 0;
 
-  if (!album_id || typeof rating !== 'number' || rating < 0.5 || rating > 5) {
+  const finalRating = overrideOverall === true && typeof rating === 'number'
+    ? rating
+    : averageMetricScore || rating;
+
+  if (!album_id || typeof finalRating !== 'number' || finalRating < 0.5 || finalRating > 5) {
     return res.status(400).json({ error: 'album_id and rating (0.5-5) are required' });
   }
 
@@ -32,15 +54,25 @@ module.exports = async function handler(req, res) {
     await ensureAlbumCached(album_id, token);
 
     const { rows } = await query(
-      `INSERT INTO reviews (user_id, album_id, rating, review_text, listened_at)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO reviews (user_id, album_id, rating, review_text, listened_at, metrics, override_overall)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
        ON CONFLICT (user_id, album_id) DO UPDATE SET
          rating = EXCLUDED.rating,
          review_text = EXCLUDED.review_text,
          listened_at = EXCLUDED.listened_at,
+         metrics = EXCLUDED.metrics,
+         override_overall = EXCLUDED.override_overall,
          updated_at = now()
        RETURNING *`,
-      [user.id, album_id, rating, review_text || null, listened_at || null]
+      [
+        user.id,
+        album_id,
+        finalRating,
+        review_text || null,
+        listened_at || null,
+        JSON.stringify(normalizedMetrics),
+        Boolean(overrideOverall && typeof rating === 'number'),
+      ]
     );
 
     res.status(201).json(rows[0]);

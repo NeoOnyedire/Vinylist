@@ -3,10 +3,42 @@ import { useParams, Link } from 'react-router-dom';
 import { api } from '../api';
 import GrooveRating from '../components/GrooveRating';
 
+const METRIC_LABELS = {
+  relatability: 'Relatability',
+  production: 'Production',
+  replayability: 'Replayability',
+};
+
+const DEFAULT_METRICS = {
+  relatability: 0,
+  production: 0,
+  replayability: 0,
+};
+
+function parseMetrics(rawMetrics) {
+  const next = { ...DEFAULT_METRICS };
+  const source = typeof rawMetrics === 'string' ? JSON.parse(rawMetrics) : rawMetrics || {};
+
+  Object.keys(next).forEach((key) => {
+    const value = Number(source?.[key]);
+    next[key] = Number.isFinite(value) ? value : 0;
+  });
+
+  return next;
+}
+
+function averageMetrics(metrics) {
+  const values = Object.values(metrics).filter((value) => Number.isFinite(value) && value > 0);
+  if (!values.length) return 0;
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
 export default function AlbumDetail() {
   const { id } = useParams();
   const [album, setAlbum] = useState(null);
-  const [rating, setRating] = useState(0);
+  const [metrics, setMetrics] = useState(DEFAULT_METRICS);
+  const [overallRating, setOverallRating] = useState(0);
+  const [overrideOverall, setOverrideOverall] = useState(false);
   const [reviewText, setReviewText] = useState('');
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -19,18 +51,30 @@ export default function AlbumDetail() {
   async function load() {
     const data = await api.getAlbum(id);
     setAlbum(data);
+
     if (data?.myReview) {
-      setRating(data.myReview.rating);
+      const reviewMetrics = parseMetrics(data.myReview.metrics);
+      const avg = averageMetrics(reviewMetrics);
+      const hasOverride = data.myReview.override_overall || Math.abs(Number(data.myReview.rating) - avg) > 0.1;
+
+      setMetrics(reviewMetrics);
+      setOverallRating(hasOverride ? Number(data.myReview.rating) || avg : avg);
+      setOverrideOverall(hasOverride);
       setReviewText(data.myReview.review_text || '');
     } else {
-      setRating(0);
+      setMetrics(DEFAULT_METRICS);
+      setOverallRating(0);
+      setOverrideOverall(false);
       setReviewText('');
     }
   }
 
   async function handleSave() {
-    if (!rating) {
-      setError('Pick a rating before saving your review.');
+    const baseScore = averageMetrics(metrics);
+    const finalOverall = overrideOverall ? (overallRating || baseScore) : baseScore;
+
+    if (!finalOverall || finalOverall < 0.5) {
+      setError('Rate the album before saving your review.');
       return;
     }
 
@@ -39,7 +83,13 @@ export default function AlbumDetail() {
     setError('');
 
     try {
-      await api.saveReview({ album_id: id, rating, review_text: reviewText });
+      await api.saveReview({
+        album_id: id,
+        rating: finalOverall,
+        review_text: reviewText,
+        metrics,
+        overrideOverall,
+      });
       setSaved(true);
       await load();
     } catch (err) {
@@ -55,7 +105,9 @@ export default function AlbumDetail() {
     setError('');
     try {
       await api.deleteReview(id);
-      setRating(0);
+      setMetrics(DEFAULT_METRICS);
+      setOverallRating(0);
+      setOverrideOverall(false);
       setReviewText('');
       setSaved(false);
       await load();
@@ -72,6 +124,8 @@ export default function AlbumDetail() {
   }
 
   const avg = album.stats && album.stats.avg_rating;
+  const computedOverall = averageMetrics(metrics) || 0;
+  const finalDisplayedOverall = overrideOverall ? (overallRating || computedOverall) : computedOverall;
 
   return (
     <div className="mx-auto max-w-2xl py-6 sm:py-10">
@@ -108,11 +162,70 @@ export default function AlbumDetail() {
         </div>
       </div>
 
+      {album.tracks && album.tracks.length > 0 && (
+        <div className="mt-6 rounded-3xl border border-groove bg-surface/70 p-4 sm:p-6">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="font-display text-xl text-cream">Tracks</h2>
+            <span className="text-xs uppercase tracking-[0.2em] text-dim">{album.tracks.length} songs</span>
+          </div>
+          <ol className="space-y-2">
+            {album.tracks.map((track, index) => (
+              <li key={track.id || `${track.name}-${index}`} className="flex items-center gap-3 rounded-xl border border-groove bg-surface2 px-3 py-2 text-sm">
+                <span className="w-5 text-right text-dim">{index + 1}.</span>
+                <span className="min-w-0 flex-1 truncate text-cream">{track.name}</span>
+                <span className="text-dim">{Math.floor((track.duration_ms || 0) / 60000)}:{String(Math.floor(((track.duration_ms || 0) % 60000) / 1000)).padStart(2, '0')}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
+
       <div className="mt-6 rounded-3xl border border-groove bg-surface/70 p-4 sm:p-6">
-        <h2 className="font-display text-xl text-cream">Your rating</h2>
-        <div className="mt-4 flex items-center justify-between gap-3 rounded-2xl border border-groove bg-surface2 px-3 py-3 sm:px-4">
-          <GrooveRating value={rating} onChange={setRating} />
-          {rating > 0 && <span className="text-sm text-label">{rating.toFixed(1)}/5</span>}
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-xl text-cream">Your score</h2>
+          <div className="flex items-center gap-2 rounded-full border border-groove bg-surface2 px-3 py-1.5 text-sm text-label">
+            <span>{finalDisplayedOverall ? finalDisplayedOverall.toFixed(1) : '–'}</span>
+            <span className="text-dim">/ 5</span>
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-4">
+          {Object.entries(METRIC_LABELS).map(([key, label]) => (
+            <div key={key} className="rounded-2xl border border-groove bg-surface2 p-3">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-sm font-medium text-cream">{label}</span>
+                <span className="text-xs text-dim">{metrics[key] ? metrics[key].toFixed(1) : '0.0'}</span>
+              </div>
+              <GrooveRating value={metrics[key]} size={24} onChange={(value) => setMetrics((current) => ({ ...current, [key]: value }))} />
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-5 rounded-2xl border border-groove bg-surface2 p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium text-cream">Overall score</p>
+              <p className="text-xs text-dim">Average of the metrics unless you override it.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                if (!overrideOverall) {
+                  setOverallRating(computedOverall || 0);
+                }
+                setOverrideOverall((current) => !current);
+              }}
+              className="rounded-full border border-label px-3 py-1.5 text-xs font-medium text-label"
+            >
+              {overrideOverall ? 'Using override' : 'Override'}
+            </button>
+          </div>
+
+          {overrideOverall && (
+            <div className="mt-3">
+              <GrooveRating value={overallRating || computedOverall || 0} size={26} onChange={setOverallRating} />
+            </div>
+          )}
         </div>
 
         <textarea
@@ -133,7 +246,7 @@ export default function AlbumDetail() {
           <button
             type="button"
             onClick={handleSave}
-            disabled={!rating || saving}
+            disabled={saving}
             className="rounded-xl bg-label px-5 py-3 text-sm font-semibold text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45"
           >
             {saving ? 'Saving…' : album.myReview ? 'Update review' : 'Save review'}

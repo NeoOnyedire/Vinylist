@@ -40,6 +40,8 @@ const schema = `
     rating NUMERIC(3,1) NOT NULL CHECK (rating >= 0.5 AND rating <= 5),
     review_text TEXT,
     listened_at TEXT,
+    metrics JSONB DEFAULT '{}'::jsonb,
+    override_overall BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ DEFAULT now(),
     updated_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE(user_id, album_id)
@@ -47,6 +49,10 @@ const schema = `
 
   CREATE INDEX IF NOT EXISTS idx_reviews_user ON reviews(user_id);
   CREATE INDEX IF NOT EXISTS idx_reviews_album ON reviews(album_id);
+
+  ALTER TABLE reviews
+    ADD COLUMN IF NOT EXISTS metrics JSONB DEFAULT '{}'::jsonb,
+    ADD COLUMN IF NOT EXISTS override_overall BOOLEAN NOT NULL DEFAULT false;
 `;
 
 (async () => {

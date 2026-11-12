@@ -11,18 +11,24 @@ module.exports = async function handler(req, res) {
   const { id } = req.query;
 
   try {
+    const token = await getValidUserToken(user.id);
     let { rows } = await query('SELECT * FROM albums WHERE id = $1', [id]);
     let album = rows[0];
 
-    if (!album) {
-      const token = await getValidUserToken(user.id);
-      album = await getAlbum(token, id);
-      await query(
-        `INSERT INTO albums (id, name, artist, image_url, release_date, spotify_url)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
-        [album.id, album.name, album.artist, album.image_url, album.release_date, album.spotify_url]
-      );
-    }
+    const spotifyAlbum = await getAlbum(token, id);
+    album = spotifyAlbum;
+
+    await query(
+      `INSERT INTO albums (id, name, artist, image_url, release_date, spotify_url)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (id) DO UPDATE SET
+         name = EXCLUDED.name,
+         artist = EXCLUDED.artist,
+         image_url = EXCLUDED.image_url,
+         release_date = EXCLUDED.release_date,
+         spotify_url = EXCLUDED.spotify_url`,
+      [album.id, album.name, album.artist, album.image_url, album.release_date, album.spotify_url]
+    );
 
     const statsResult = await query(
       `SELECT COUNT(*)::int AS review_count, AVG(rating)::float AS avg_rating
