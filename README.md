@@ -55,18 +55,18 @@ Go back to the Spotify dashboard and make sure the Redirect URI there **exactly*
 
 ## 4. Run the migration
 
-The tables aren't created automatically (running schema changes on every cold start would be wasteful) — run the migration yourself:
+The tables aren't created automatically (running schema changes on every cold start would be wasteful). For a new database, set `POSTGRES_URL` or `DATABASE_URL` locally and run `npm run migrate`; the script is safe to rerun.
 
-```bash
-vercel link               # only needed if this folder is not linked yet
-vercel env pull .env        # pulls your Vercel env vars into a local .env file
-npm ci                     # install the project's locked dependencies
-npm run migrate
+Vercel Secret environment variables are write-only, so `vercel env pull` may not provide the database URL locally. For the existing Neon database, open its SQL Editor and run this additive migration:
+
+```sql
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS spotify_access_token TEXT,
+  ADD COLUMN IF NOT EXISTS spotify_refresh_token TEXT,
+  ADD COLUMN IF NOT EXISTS spotify_token_expires_at TIMESTAMPTZ;
 ```
 
-When prompted by `vercel link`, select the team and project where Vinylist is deployed. If the Vercel CLI asks to upgrade, declining is fine; the upgrade is not required for these commands.
-
-That creates `users`, `albums`, and `reviews`, and adds any columns required by newer app versions. Re-running it is safe. Run it again after deploying schema updates. If you already have an account, sign out and sign back in after running the migration so Vinylist can save your Spotify tokens for catalog search.
+Afterward, sign out of Vinylist and sign back in so Spotify tokens are saved for catalog search.
 
 ## Local development
 
