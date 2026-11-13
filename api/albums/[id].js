@@ -42,7 +42,19 @@ module.exports = async function handler(req, res) {
       [id, user.id]
     );
 
-    res.json({ ...album, stats, myReview: myReviewResult.rows[0] || null });
+    const trackRankingsResult = await query(
+      `SELECT track_id, rating::float AS rating, is_favorite
+       FROM track_rankings
+       WHERE album_id = $1 AND user_id = $2`,
+      [id, user.id]
+    );
+
+    res.json({
+      ...album,
+      stats,
+      myReview: myReviewResult.rows[0] || null,
+      trackRankings: trackRankingsResult.rows,
+    });
   } catch (err) {
     console.error(err);
     res.status(502).json({ error: 'Could not load album' });

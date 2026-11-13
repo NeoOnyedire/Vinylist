@@ -38,6 +38,19 @@ const schema = `
     spotify_url TEXT
   );
 
+  CREATE TABLE IF NOT EXISTS track_rankings (
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    album_id TEXT NOT NULL REFERENCES albums(id) ON DELETE CASCADE,
+    track_id TEXT NOT NULL,
+    rating NUMERIC(2,1) CHECK (
+      rating IS NULL OR (
+        rating >= 0.5 AND rating <= 5 AND rating * 2 = TRUNC(rating * 2)
+      )
+    ),
+    is_favorite BOOLEAN NOT NULL DEFAULT false,
+    PRIMARY KEY (user_id, album_id, track_id)
+  );
+
   CREATE TABLE IF NOT EXISTS reviews (
     id SERIAL PRIMARY KEY,
     user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,

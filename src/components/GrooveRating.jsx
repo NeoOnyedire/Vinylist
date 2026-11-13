@@ -1,6 +1,12 @@
 // The app's signature interaction: rate albums 0.5-5 using small vinyl-record
 // icons instead of stars. Each record can be half or fully "pressed" (filled).
-export default function GrooveRating({ value = 0, onChange, size = 28, readOnly = false }) {
+export default function GrooveRating({
+  value = 0,
+  onChange,
+  size = 28,
+  readOnly = false,
+  ariaLabel = 'Rating',
+}) {
   const discs = [1, 2, 3, 4, 5];
 
   function fillFor(discIndex) {
@@ -16,7 +22,7 @@ export default function GrooveRating({ value = 0, onChange, size = 28, readOnly 
   }
 
   return (
-    <div className="flex items-center gap-1.5" role={readOnly ? undefined : 'radiogroup'} aria-label="Rating">
+    <div className="flex items-center gap-1.5" role={readOnly ? undefined : 'radiogroup'} aria-label={ariaLabel}>
       {discs.map((d) => {
         const fill = fillFor(d);
         return (
@@ -43,13 +49,13 @@ export default function GrooveRating({ value = 0, onChange, size = 28, readOnly 
               <>
                 <button
                   type="button"
-                  aria-label={`Rate ${d - 0.5}`}
+                  aria-label={`${ariaLabel}: rate ${d - 0.5}`}
                   className="absolute inset-y-0 left-0 w-1/2"
                   onClick={() => handleClick(d, 'left')}
                 />
                 <button
                   type="button"
-                  aria-label={`Rate ${d}`}
+                  aria-label={`${ariaLabel}: rate ${d}`}
                   className="absolute inset-y-0 right-0 w-1/2"
                   onClick={() => handleClick(d, 'right')}
                 />

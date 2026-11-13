@@ -52,6 +52,8 @@ export const api = {
   userProfile: (id) => request(`/api/users/${id}`),
   searchAlbums: (q) => request(`/api/albums/search?q=${encodeURIComponent(q)}`),
   getAlbum: (id) => request(`/api/albums/${id}`),
+  saveTrackRankings: (albumId, payload) =>
+    request(`/api/albums/${albumId}/tracks`, { method: 'PUT', body: JSON.stringify(payload) }),
   saveReview: (payload) =>
     request('/api/reviews', { method: 'POST', body: JSON.stringify(payload) }),
   deleteReview: (albumId) =>

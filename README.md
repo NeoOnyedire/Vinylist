@@ -64,9 +64,22 @@ ALTER TABLE users
   ADD COLUMN IF NOT EXISTS spotify_access_token TEXT,
   ADD COLUMN IF NOT EXISTS spotify_refresh_token TEXT,
   ADD COLUMN IF NOT EXISTS spotify_token_expires_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS track_rankings (
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  album_id TEXT NOT NULL REFERENCES albums(id) ON DELETE CASCADE,
+  track_id TEXT NOT NULL,
+  rating NUMERIC(2,1) CHECK (
+    rating IS NULL OR (
+      rating >= 0.5 AND rating <= 5 AND rating * 2 = TRUNC(rating * 2)
+    )
+  ),
+  is_favorite BOOLEAN NOT NULL DEFAULT false,
+  PRIMARY KEY (user_id, album_id, track_id)
+);
 ```
 
-Afterward, sign out of Vinylist and sign back in so Spotify tokens are saved for catalog search.
+Afterward, sign out of Vinylist and sign back in so Spotify tokens are saved for catalog search. Re-run the migration after deploying schema updates; it is safe to run again.
 
 ## Local development
 

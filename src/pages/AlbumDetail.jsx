@@ -44,6 +44,11 @@ export default function AlbumDetail() {
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [trackRatings, setTrackRatings] = useState({});
+  const [favoriteTrackIds, setFavoriteTrackIds] = useState([]);
+  const [savingTracks, setSavingTracks] = useState(false);
+  const [tracksSaved, setTracksSaved] = useState(false);
+  const [trackError, setTrackError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -64,6 +69,19 @@ export default function AlbumDetail() {
       if (!isActive()) return;
 
       setAlbum(data);
+      const nextTrackRatings = {};
+      const nextFavoriteTrackIds = [];
+      (data.trackRankings || []).forEach((ranking) => {
+        if (ranking.rating !== null && ranking.rating !== undefined) {
+          nextTrackRatings[ranking.track_id] = Number(ranking.rating);
+        }
+        if (ranking.is_favorite) nextFavoriteTrackIds.push(ranking.track_id);
+      });
+      setTrackRatings(nextTrackRatings);
+      setFavoriteTrackIds(nextFavoriteTrackIds);
+      setTracksSaved(false);
+      setTrackError('');
+
       if (data.myReview) {
         const reviewMetrics = parseMetrics(data.myReview.metrics);
         const avg = averageMetrics(reviewMetrics);
@@ -137,6 +155,46 @@ export default function AlbumDetail() {
     }
   }
 
+  function handleTrackRating(trackId, rating) {
+    setTrackRatings((current) => ({ ...current, [trackId]: rating }));
+    setTracksSaved(false);
+    setTrackError('');
+  }
+
+  function toggleFavorite(trackId) {
+    if (favoriteTrackIds.includes(trackId)) {
+      setFavoriteTrackIds((current) => current.filter((id) => id !== trackId));
+      setTracksSaved(false);
+      setTrackError('');
+      return;
+    }
+
+    if (favoriteTrackIds.length >= 3) {
+      setTrackError('You can choose up to 3 favorite songs per album. Remove one first.');
+      return;
+    }
+
+    setFavoriteTrackIds((current) => [...current, trackId]);
+    setTracksSaved(false);
+    setTrackError('');
+  }
+
+  async function handleSaveTrackRankings() {
+    setSavingTracks(true);
+    setTracksSaved(false);
+    setTrackError('');
+
+    try {
+      await api.saveTrackRankings(id, { trackRatings, favoriteTrackIds });
+      setTracksSaved(true);
+    } catch (err) {
+      console.error(err);
+      setTrackError('Could not save song rankings. Please try again.');
+    } finally {
+      setSavingTracks(false);
+    }
+  }
+
   if (!album && loading) {
     return <div className="mx-auto max-w-2xl py-10 text-sm text-dim">Loading album…</div>;
   }
@@ -203,19 +261,65 @@ export default function AlbumDetail() {
 
       {album.tracks && album.tracks.length > 0 && (
         <div className="mt-6 rounded-3xl border border-groove bg-surface/70 p-4 sm:p-6">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-display text-xl text-cream">Tracks</h2>
-            <span className="text-xs uppercase tracking-[0.2em] text-dim">{album.tracks.length} songs</span>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="font-display text-xl text-cream">Rank the songs</h2>
+              <p className="mt-1 text-xs text-dim">Rate each song and choose up to 3 favorites.</p>
+            </div>
+            <span className="text-xs uppercase tracking-[0.2em] text-dim">
+              {favoriteTrackIds.length}/3 favorites
+            </span>
           </div>
-          <ol className="space-y-2">
+          <ol className="space-y-3">
             {album.tracks.map((track, index) => (
-              <li key={track.id || `${track.name}-${index}`} className="flex items-center gap-3 rounded-xl border border-groove bg-surface2 px-3 py-2 text-sm">
-                <span className="w-5 text-right text-dim">{index + 1}.</span>
-                <span className="min-w-0 flex-1 truncate text-cream">{track.name}</span>
-                <span className="text-dim">{Math.floor((track.duration_ms || 0) / 60000)}:{String(Math.floor(((track.duration_ms || 0) % 60000) / 1000)).padStart(2, '0')}</span>
+              <li key={track.id || `${track.name}-${index}`} className="rounded-xl border border-groove bg-surface2 px-3 py-3">
+                <div className="flex items-center gap-3 text-sm">
+                  <span className="w-5 text-right text-dim">{index + 1}.</span>
+                  <span className="min-w-0 flex-1 truncate text-cream">{track.name}</span>
+                  <span className="shrink-0 text-dim">{Math.floor((track.duration_ms || 0) / 60000)}:{String(Math.floor(((track.duration_ms || 0) % 60000) / 1000)).padStart(2, '0')}</span>
+                </div>
+                {track.id && (
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 pl-8">
+                    <GrooveRating
+                      value={trackRatings[track.id] || 0}
+                      size={20}
+                      ariaLabel={`Rate ${track.name}`}
+                      onChange={(rating) => handleTrackRating(track.id, rating)}
+                    />
+                    <button
+                      type="button"
+                      aria-pressed={favoriteTrackIds.includes(track.id)}
+                      aria-label={`${favoriteTrackIds.includes(track.id) ? 'Remove' : 'Add'} ${track.name} ${favoriteTrackIds.includes(track.id) ? 'from' : 'to'} favorites`}
+                      onClick={() => toggleFavorite(track.id)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition ${
+                        favoriteTrackIds.includes(track.id)
+                          ? 'border-label bg-label/10 text-label'
+                          : 'border-groove text-dim hover:border-label hover:text-cream'
+                      }`}
+                    >
+                      {favoriteTrackIds.includes(track.id) ? '★ Favorite' : '☆ Favorite'}
+                    </button>
+                  </div>
+                )}
               </li>
             ))}
           </ol>
+          {trackError && (
+            <p className="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+              {trackError}
+            </p>
+          )}
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSaveTrackRankings}
+              disabled={savingTracks}
+              className="rounded-xl bg-label px-4 py-2.5 text-sm font-semibold text-ink transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-45"
+            >
+              {savingTracks ? 'Saving songs…' : 'Save song rankings'}
+            </button>
+            {tracksSaved && <span className="text-sm text-tape">Songs saved ✓</span>}
+          </div>
         </div>
       )}
 
