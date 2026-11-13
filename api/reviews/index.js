@@ -16,6 +16,17 @@ async function ensureAlbumCached(albumId, token) {
   );
 }
 
+async function getReviewColumns() {
+  const { rows } = await query(
+    `SELECT column_name
+     FROM information_schema.columns
+     WHERE table_schema = current_schema()
+       AND table_name = 'reviews'`
+  );
+
+  return new Set(rows.map((row) => row.column_name));
+}
+
 function normalizeMetrics(metrics) {
   const defaults = { relatability: 0, production: 0, replayability: 0 };
   if (!metrics || typeof metrics !== 'object') return defaults;
@@ -53,27 +64,49 @@ module.exports = async function handler(req, res) {
     const token = await getValidUserToken(user.id);
     await ensureAlbumCached(album_id, token);
 
-    const { rows } = await query(
-      `INSERT INTO reviews (user_id, album_id, rating, review_text, listened_at, metrics, override_overall)
-       VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
-       ON CONFLICT (user_id, album_id) DO UPDATE SET
-         rating = EXCLUDED.rating,
-         review_text = EXCLUDED.review_text,
-         listened_at = EXCLUDED.listened_at,
-         metrics = EXCLUDED.metrics,
-         override_overall = EXCLUDED.override_overall,
-         updated_at = now()
-       RETURNING *`,
-      [
-        user.id,
-        album_id,
-        finalRating,
-        review_text || null,
-        listened_at || null,
-        JSON.stringify(normalizedMetrics),
-        Boolean(overrideOverall && typeof rating === 'number'),
-      ]
-    );
+    const reviewColumns = await getReviewColumns();
+    const supportsMetrics = reviewColumns.has('metrics');
+    const supportsOverrideOverall = reviewColumns.has('override_overall');
+
+    const queryText = supportsMetrics && supportsOverrideOverall
+      ? `INSERT INTO reviews (user_id, album_id, rating, review_text, listened_at, metrics, override_overall)
+         VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)
+         ON CONFLICT (user_id, album_id) DO UPDATE SET
+           rating = EXCLUDED.rating,
+           review_text = EXCLUDED.review_text,
+           listened_at = EXCLUDED.listened_at,
+           metrics = EXCLUDED.metrics,
+           override_overall = EXCLUDED.override_overall,
+           updated_at = now()
+         RETURNING *`
+      : `INSERT INTO reviews (user_id, album_id, rating, review_text, listened_at)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT (user_id, album_id) DO UPDATE SET
+           rating = EXCLUDED.rating,
+           review_text = EXCLUDED.review_text,
+           listened_at = EXCLUDED.listened_at,
+           updated_at = now()
+         RETURNING *`;
+
+    const queryParams = supportsMetrics && supportsOverrideOverall
+      ? [
+          user.id,
+          album_id,
+          finalRating,
+          review_text || null,
+          listened_at || null,
+          JSON.stringify(normalizedMetrics),
+          Boolean(overrideOverall && typeof rating === 'number'),
+        ]
+      : [
+          user.id,
+          album_id,
+          finalRating,
+          review_text || null,
+          listened_at || null,
+        ];
+
+    const { rows } = await query(queryText, queryParams);
 
     res.status(201).json(rows[0]);
   } catch (err) {
