@@ -1,11 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import AlbumCard from '../components/AlbumCard';
+import { SORT_OPTIONS, filterAndSortReviews } from '../lib/rankings';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState('rating-desc');
 
   useEffect(() => {
     (async () => {
@@ -20,6 +23,11 @@ export default function Profile() {
       }
     })();
   }, []);
+
+  const visible = useMemo(
+    () => filterAndSortReviews(reviews, { query, sort }),
+    [reviews, query, sort]
+  );
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10">
@@ -52,8 +60,39 @@ export default function Profile() {
         </div>
       )}
 
+      {reviews.length > 1 && (
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter by album or artist…"
+            aria-label="Filter rankings"
+            className="flex-1 rounded-xl border border-groove bg-surface2 px-4 py-2.5 text-sm text-cream placeholder:text-dim focus:border-label focus:outline-none"
+          />
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+            aria-label="Sort rankings"
+            className="rounded-xl border border-groove bg-surface2 px-3 py-2.5 text-sm text-cream focus:border-label focus:outline-none"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
+      {query.trim() && visible.length === 0 && reviews.length > 0 && (
+        <p className="py-8 text-center text-sm text-dim">
+          No ranked albums match “{query.trim()}”.
+        </p>
+      )}
+
       <div className="flex flex-col gap-1">
-        {reviews.map((r) => (
+        {visible.map((r) => (
           <AlbumCard
             key={r.id}
             rank={r.rank}
