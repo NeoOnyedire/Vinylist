@@ -1,0 +1,58 @@
+// Pure helpers for ordering and filtering a user's ranked albums.
+// Each review keeps its `rank` (position in the full list), so a filtered
+// view still shows each album's true overall rank.
+
+export const SORT_OPTIONS = [
+  { value: 'rating-desc', label: 'Highest rated' },
+  { value: 'rating-asc', label: 'Lowest rated' },
+  { value: 'recent', label: 'Recently updated' },
+  { value: 'title', label: 'Title A–Z' },
+  { value: 'artist', label: 'Artist A–Z' },
+  { value: 'year-desc', label: 'Newest release' },
+  { value: 'year-asc', label: 'Oldest release' },
+];
+
+function releaseYear(review) {
+  const year = parseInt(String(review.release_date || '').slice(0, 4), 10);
+  return Number.isFinite(year) ? year : null;
+}
+
+function byText(a, b) {
+  return String(a || '').localeCompare(String(b || ''), undefined, { sensitivity: 'base' });
+}
+
+// Albums with an unknown year always sort last, whichever direction is chosen.
+function byYear(direction) {
+  return (a, b) => {
+    const ya = releaseYear(a);
+    const yb = releaseYear(b);
+    if (ya === null && yb === null) return 0;
+    if (ya === null) return 1;
+    if (yb === null) return -1;
+    return direction === 'asc' ? ya - yb : yb - ya;
+  };
+}
+
+const COMPARATORS = {
+  'rating-desc': (a, b) => Number(b.rating) - Number(a.rating) || a.rank - b.rank,
+  'rating-asc': (a, b) => Number(a.rating) - Number(b.rating) || b.rank - a.rank,
+  recent: (a, b) => new Date(b.updated_at || 0) - new Date(a.updated_at || 0),
+  title: (a, b) => byText(a.album_name, b.album_name),
+  artist: (a, b) => byText(a.artist, b.artist) || byText(a.album_name, b.album_name),
+  'year-desc': byYear('desc'),
+  'year-asc': byYear('asc'),
+};
+
+export function filterAndSortReviews(reviews, { query = '', sort = 'rating-desc' } = {}) {
+  const needle = query.trim().toLowerCase();
+  const filtered = needle
+    ? reviews.filter(
+        (r) =>
+          String(r.album_name || '').toLowerCase().includes(needle) ||
+          String(r.artist || '').toLowerCase().includes(needle)
+      )
+    : reviews;
+
+  const compare = COMPARATORS[sort] || COMPARATORS['rating-desc'];
+  return [...filtered].sort(compare);
+}
