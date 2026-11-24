@@ -107,6 +107,7 @@ export default function Profile() {
               name: r.album_name,
               artist: r.artist,
               image_url: r.image_url,
+              release_date: r.release_date,
             }}
           />
         ))}
