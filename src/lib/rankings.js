@@ -56,3 +56,32 @@ export function filterAndSortReviews(reviews, { query = '', sort = 'rating-desc'
   const compare = COMPARATORS[sort] || COMPARATORS['rating-desc'];
   return [...filtered].sort(compare);
 }
+
+// Summary numbers for the profile header.
+// topDecade is the decade holding the most ranked albums (ties go to the more
+// recent decade); albums with an unknown release year are ignored for it.
+export function computeStats(reviews) {
+  const count = reviews.length;
+  if (!count) return { count: 0, average: null, topDecade: null, topDecadeCount: 0 };
+
+  const total = reviews.reduce((sum, r) => sum + Number(r.rating), 0);
+
+  const decades = new Map();
+  for (const r of reviews) {
+    const year = releaseYear(r);
+    if (year === null) continue;
+    const decade = Math.floor(year / 10) * 10;
+    decades.set(decade, (decades.get(decade) || 0) + 1);
+  }
+
+  let topDecade = null;
+  let topDecadeCount = 0;
+  for (const [decade, n] of decades) {
+    if (n > topDecadeCount || (n === topDecadeCount && decade > topDecade)) {
+      topDecade = decade;
+      topDecadeCount = n;
+    }
+  }
+
+  return { count, average: total / count, topDecade, topDecadeCount };
+}
