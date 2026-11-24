@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { api } from '../api';
 import AlbumCard from '../components/AlbumCard';
 import StatsSummary from '../components/StatsSummary';
+import RatingHistogram from '../components/RatingHistogram';
 import { SORT_OPTIONS, filterAndSortReviews } from '../lib/rankings';
 
 export default function Profile() {
@@ -51,6 +52,7 @@ export default function Profile() {
       )}
 
       <StatsSummary reviews={reviews} />
+      <RatingHistogram reviews={reviews} />
 
       {loading && <p className="text-dim text-sm">Loading your rankings…</p>}
 
