@@ -99,3 +99,19 @@ export function ratingDistribution(reviews) {
   }
   return buckets;
 }
+
+// Split an already-sorted list into decade groups, newest decade first.
+// Order inside each group is preserved; albums with no known year go in a
+// final group with decade: null.
+export function groupByDecade(reviews) {
+  const groups = new Map();
+  for (const r of reviews) {
+    const year = releaseYear(r);
+    const decade = year === null ? null : Math.floor(year / 10) * 10;
+    if (!groups.has(decade)) groups.set(decade, []);
+    groups.get(decade).push(r);
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => (a === null ? 1 : b === null ? -1 : b - a))
+    .map(([decade, items]) => ({ decade, items }));
+}
