@@ -1,6 +1,8 @@
 import { Link } from 'react-router-dom';
+import { releaseYear } from '../lib/rankings';
 
 export default function AlbumCard({ album, rank, rating }) {
+  const year = releaseYear(album);
   return (
     <Link
       to={`/album/${album.id}`}
@@ -30,7 +32,10 @@ export default function AlbumCard({ album, rank, rating }) {
         <p className="truncate text-base font-medium text-cream transition group-hover:text-label">
           {album.name}
         </p>
-        <p className="truncate text-sm text-dim">{album.artist}</p>
+        <p className="truncate text-sm text-dim">
+          {album.artist}
+          {year && <span aria-label={`released ${year}`}> · {year}</span>}
+        </p>
       </div>
 
       {typeof rating === 'number' && (
