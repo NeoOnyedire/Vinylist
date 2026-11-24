@@ -85,3 +85,17 @@ export function computeStats(reviews) {
 
   return { count, average: total / count, topDecade, topDecadeCount };
 }
+
+// Counts of reviews per rating bucket, from 0.5 to 5 in half-point steps.
+// Ratings are snapped to the nearest half so stray values still land in a bucket.
+export function ratingDistribution(reviews) {
+  const buckets = Array.from({ length: 10 }, (_, i) => ({ rating: (i + 1) / 2, count: 0 }));
+  for (const r of reviews) {
+    if (r.rating === null || r.rating === undefined || r.rating === '') continue;
+    const value = Number(r.rating);
+    if (!Number.isFinite(value)) continue;
+    const index = Math.min(9, Math.max(0, Math.round(value * 2) - 1));
+    buckets[index].count += 1;
+  }
+  return buckets;
+}
