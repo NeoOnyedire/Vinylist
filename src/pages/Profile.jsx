@@ -3,7 +3,7 @@ import { api } from '../api';
 import AlbumCard from '../components/AlbumCard';
 import StatsSummary from '../components/StatsSummary';
 import RatingHistogram from '../components/RatingHistogram';
-import { SORT_OPTIONS, filterAndSortReviews } from '../lib/rankings';
+import { SORT_OPTIONS, filterAndSortReviews, groupByDecade } from '../lib/rankings';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
@@ -11,6 +11,7 @@ export default function Profile() {
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState('rating-desc');
+  const [grouped, setGrouped] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -30,6 +31,25 @@ export default function Profile() {
     () => filterAndSortReviews(reviews, { query, sort }),
     [reviews, query, sort]
   );
+
+  const groups = useMemo(() => (grouped ? groupByDecade(visible) : []), [grouped, visible]);
+
+  function renderCard(r) {
+    return (
+      <AlbumCard
+        key={r.id}
+        rank={r.rank}
+        rating={r.rating}
+        album={{
+          id: r.album_id,
+          name: r.album_name,
+          artist: r.artist,
+          image_url: r.image_url,
+          release_date: r.release_date,
+        }}
+      />
+    );
+  }
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10">
@@ -87,6 +107,18 @@ export default function Profile() {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={() => setGrouped((g) => !g)}
+            aria-pressed={grouped}
+            className={`rounded-xl border px-3 py-2.5 text-sm transition ${
+              grouped
+                ? 'border-label bg-label/15 text-label'
+                : 'border-groove bg-surface2 text-dim hover:border-label hover:text-cream'
+            }`}
+          >
+            By decade
+          </button>
         </div>
       )}
 
@@ -96,22 +128,23 @@ export default function Profile() {
         </p>
       )}
 
-      <div className="flex flex-col gap-1">
-        {visible.map((r) => (
-          <AlbumCard
-            key={r.id}
-            rank={r.rank}
-            rating={r.rating}
-            album={{
-              id: r.album_id,
-              name: r.album_name,
-              artist: r.artist,
-              image_url: r.image_url,
-              release_date: r.release_date,
-            }}
-          />
-        ))}
-      </div>
+      {grouped ? (
+        <div className="flex flex-col gap-6">
+          {groups.map((g) => (
+            <section key={g.decade ?? 'unknown'} aria-label={g.decade === null ? 'Unknown year' : `${g.decade}s`}>
+              <h2 className="mb-2 flex items-baseline gap-2 font-display text-lg text-cream">
+                {g.decade === null ? 'Unknown year' : `${g.decade}s`}
+                <span className="text-xs font-body text-dim">
+                  {g.items.length} album{g.items.length === 1 ? '' : 's'}
+                </span>
+              </h2>
+              <div className="flex flex-col gap-1">{g.items.map(renderCard)}</div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1">{visible.map(renderCard)}</div>
+      )}
     </div>
   );
 }
