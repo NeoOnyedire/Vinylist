@@ -12,8 +12,8 @@ export const SORT_OPTIONS = [
   { value: 'year-asc', label: 'Oldest release' },
 ];
 
-function releaseYear(review) {
-  const year = parseInt(String(review.release_date || '').slice(0, 4), 10);
+export function releaseYear(item) {
+  const year = parseInt(String(item?.release_date || '').slice(0, 4), 10);
   return Number.isFinite(year) ? year : null;
 }
 
