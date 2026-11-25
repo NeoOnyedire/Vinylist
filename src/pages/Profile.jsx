@@ -4,6 +4,7 @@ import { api } from '../api';
 import AlbumCard from '../components/AlbumCard';
 import StatsSummary from '../components/StatsSummary';
 import RatingHistogram from '../components/RatingHistogram';
+import { downloadCsv, rankingsToCsv } from '../lib/exportCsv';
 import { DEFAULT_SORT, SORT_OPTIONS, filterAndSortReviews, groupByDecade } from '../lib/rankings';
 
 export default function Profile() {
@@ -52,6 +53,11 @@ export default function Profile() {
 
   const groups = useMemo(() => (grouped ? groupByDecade(visible) : []), [grouped, visible]);
 
+  function handleExportCsv() {
+    const date = new Date().toISOString().slice(0, 10);
+    downloadCsv(`vinylist-rankings-${date}.csv`, rankingsToCsv(reviews));
+  }
+
   function renderCard(r) {
     return (
       <AlbumCard
@@ -86,6 +92,15 @@ export default function Profile() {
               {reviews.length} album{reviews.length === 1 ? '' : 's'} ranked
             </p>
           </div>
+          {reviews.length > 0 && (
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="ml-auto rounded-full border border-groove bg-surface/80 px-3 py-1.5 text-xs font-medium text-dim transition hover:border-label hover:text-cream sm:text-sm"
+            >
+              Export CSV
+            </button>
+          )}
         </div>
       )}
 
