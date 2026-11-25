@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import AlbumCard from '../components/AlbumCard';
 import StatsSummary from '../components/StatsSummary';
 import RatingHistogram from '../components/RatingHistogram';
+import { buildBackup, downloadJson, parseBackup } from '../lib/backup';
 import { downloadCsv, rankingsToCsv } from '../lib/exportCsv';
 import { DEFAULT_SORT, SORT_OPTIONS, filterAndSortReviews, groupByDecade } from '../lib/rankings';
 
@@ -11,6 +12,9 @@ export default function Profile() {
   const [user, setUser] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [notice, setNotice] = useState(null); // { kind: 'ok' | 'error', text }
+  const fileInputRef = useRef(null);
   // Filter, sort and grouping live in the URL (?q=&sort=&group=decade) so a
   // view survives refresh and can be bookmarked. Defaults are left out.
   const [searchParams, setSearchParams] = useSearchParams();
@@ -58,6 +62,34 @@ export default function Profile() {
     downloadCsv(`vinylist-rankings-${date}.csv`, rankingsToCsv(reviews));
   }
 
+  function handleExportJson() {
+    const date = new Date().toISOString().slice(0, 10);
+    downloadJson(`vinylist-backup-${date}.json`, buildBackup(reviews));
+    setNotice({ kind: 'ok', text: `Saved a backup of ${reviews.length} ranking${reviews.length === 1 ? '' : 's'}.` });
+  }
+
+  async function handleImportFile(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = ''; // allow picking the same file again
+    if (!file) return;
+
+    setImporting(true);
+    setNotice(null);
+    try {
+      const entries = parseBackup(await file.text());
+      const result = await api.importReviews(entries);
+      setReviews((await api.myReviews()) || []);
+      const parts = [`Imported ${result.imported}`];
+      if (result.skipped) parts.push(`${result.skipped} already ranked`);
+      if (result.invalid) parts.push(`${result.invalid} invalid`);
+      setNotice({ kind: 'ok', text: `${parts.join(', ')}.` });
+    } catch (err) {
+      setNotice({ kind: 'error', text: err.message || 'Import failed.' });
+    } finally {
+      setImporting(false);
+    }
+  }
+
   function renderCard(r) {
     return (
       <AlbumCard
@@ -92,16 +124,48 @@ export default function Profile() {
               {reviews.length} album{reviews.length === 1 ? '' : 's'} ranked
             </p>
           </div>
-          {reviews.length > 0 && (
+          <div className="ml-auto flex flex-wrap justify-end gap-1.5">
+            {reviews.length > 0 && (
+              <>
+                <button type="button" onClick={handleExportCsv} className="rounded-full border border-groove bg-surface/80 px-3 py-1.5 text-xs font-medium text-dim transition hover:border-label hover:text-cream disabled:opacity-60 sm:text-sm">
+                  Export CSV
+                </button>
+                <button type="button" onClick={handleExportJson} className="rounded-full border border-groove bg-surface/80 px-3 py-1.5 text-xs font-medium text-dim transition hover:border-label hover:text-cream disabled:opacity-60 sm:text-sm">
+                  Export JSON
+                </button>
+              </>
+            )}
             <button
               type="button"
-              onClick={handleExportCsv}
-              className="ml-auto rounded-full border border-groove bg-surface/80 px-3 py-1.5 text-xs font-medium text-dim transition hover:border-label hover:text-cream sm:text-sm"
+              onClick={() => fileInputRef.current && fileInputRef.current.click()}
+              disabled={importing}
+              className="rounded-full border border-groove bg-surface/80 px-3 py-1.5 text-xs font-medium text-dim transition hover:border-label hover:text-cream disabled:opacity-60 sm:text-sm"
             >
-              Export CSV
+              {importing ? 'Importing…' : 'Import JSON'}
             </button>
-          )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="application/json,.json"
+              onChange={handleImportFile}
+              className="hidden"
+              aria-label="Import rankings from a JSON backup"
+            />
+          </div>
         </div>
+      )}
+
+      {notice && (
+        <p
+          role="status"
+          className={`mb-4 rounded-xl border px-4 py-2.5 text-sm ${
+            notice.kind === 'error'
+              ? 'border-red-500/40 bg-red-500/10 text-red-200'
+              : 'border-tape/40 bg-tape/10 text-cream'
+          }`}
+        >
+          {notice.text}
+        </p>
       )}
 
       <StatsSummary reviews={reviews} />
