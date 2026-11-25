@@ -56,6 +56,8 @@ export const api = {
     request(`/api/albums/${albumId}/tracks`, { method: 'PUT', body: JSON.stringify(payload) }),
   saveReview: (payload) =>
     request('/api/reviews', { method: 'POST', body: JSON.stringify(payload) }),
+  importReviews: (reviews) =>
+    request('/api/reviews/import', { method: 'POST', body: JSON.stringify({ reviews }) }),
   deleteReview: (albumId) =>
     request(`/api/reviews/${albumId}`, { method: 'DELETE' }),
 };
