@@ -2,6 +2,8 @@
 // Each review keeps its `rank` (position in the full list), so a filtered
 // view still shows each album's true overall rank.
 
+export const DEFAULT_SORT = 'rating-desc';
+
 export const SORT_OPTIONS = [
   { value: 'rating-desc', label: 'Highest rated' },
   { value: 'rating-asc', label: 'Lowest rated' },
@@ -43,7 +45,7 @@ const COMPARATORS = {
   'year-asc': byYear('asc'),
 };
 
-export function filterAndSortReviews(reviews, { query = '', sort = 'rating-desc' } = {}) {
+export function filterAndSortReviews(reviews, { query = '', sort = DEFAULT_SORT } = {}) {
   const needle = query.trim().toLowerCase();
   const filtered = needle
     ? reviews.filter(
@@ -53,7 +55,7 @@ export function filterAndSortReviews(reviews, { query = '', sort = 'rating-desc'
       )
     : reviews;
 
-  const compare = COMPARATORS[sort] || COMPARATORS['rating-desc'];
+  const compare = COMPARATORS[sort] || COMPARATORS[DEFAULT_SORT];
   return [...filtered].sort(compare);
 }
 
