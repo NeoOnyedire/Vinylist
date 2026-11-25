@@ -1,17 +1,35 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import AlbumCard from '../components/AlbumCard';
 import StatsSummary from '../components/StatsSummary';
 import RatingHistogram from '../components/RatingHistogram';
-import { SORT_OPTIONS, filterAndSortReviews, groupByDecade } from '../lib/rankings';
+import { DEFAULT_SORT, SORT_OPTIONS, filterAndSortReviews, groupByDecade } from '../lib/rankings';
 
 export default function Profile() {
   const [user, setUser] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState('');
-  const [sort, setSort] = useState('rating-desc');
-  const [grouped, setGrouped] = useState(false);
+  // Filter, sort and grouping live in the URL (?q=&sort=&group=decade) so a
+  // view survives refresh and can be bookmarked. Defaults are left out.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const query = searchParams.get('q') || '';
+  const sortParam = searchParams.get('sort');
+  const sort = SORT_OPTIONS.some((o) => o.value === sortParam) ? sortParam : DEFAULT_SORT;
+  const grouped = searchParams.get('group') === 'decade';
+
+  function updateParams(changes) {
+    const next = new URLSearchParams(searchParams);
+    for (const [key, value] of Object.entries(changes)) {
+      if (value) next.set(key, value);
+      else next.delete(key);
+    }
+    setSearchParams(next, { replace: true });
+  }
+
+  const setQuery = (value) => updateParams({ q: value });
+  const setSort = (value) => updateParams({ sort: value === DEFAULT_SORT ? '' : value });
+  const toggleGrouped = () => updateParams({ group: grouped ? '' : 'decade' });
 
   useEffect(() => {
     (async () => {
@@ -109,7 +127,7 @@ export default function Profile() {
           </select>
           <button
             type="button"
-            onClick={() => setGrouped((g) => !g)}
+            onClick={toggleGrouped}
             aria-pressed={grouped}
             className={`rounded-xl border px-3 py-2.5 text-sm transition ${
               grouped
