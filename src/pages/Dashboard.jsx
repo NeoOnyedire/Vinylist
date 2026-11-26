@@ -2,6 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import AlbumCard from '../components/AlbumCard';
 import AlbumCardSkeleton from '../components/AlbumCardSkeleton';
+import {
+  addRecentSearch,
+  clearRecentSearches,
+  getRecentSearches,
+  removeRecentSearch,
+} from '../lib/recentSearches';
 
 const SAMPLE_SEARCHES = ['Fleetwood Mac', 'Kendrick Lamar', 'Magdalena Bay'];
 const DEBOUNCE_MS = 350;
@@ -13,6 +19,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState('');
+  const [recent, setRecent] = useState(getRecentSearches);
 
   // Every search gets an id; only the newest one may update the screen, so a
   // slow response for "fleet" can't overwrite the results for "fleetwood mac".
@@ -27,16 +34,18 @@ export default function Dashboard() {
 
     try {
       const albums = await api.searchAlbums(term);
-      if (id !== latestSearch.current) return;
+      if (id !== latestSearch.current) return null;
       setResults(albums || []);
       if (!albums || albums.length === 0) {
         setError(`No albums found for “${term}”.`);
       }
+      return albums || [];
     } catch (err) {
-      if (id !== latestSearch.current) return;
+      if (id !== latestSearch.current) return null;
       console.error(err);
       setError('Search failed. Please try again in a moment.');
       setResults([]);
+      return null;
     } finally {
       if (id === latestSearch.current) setLoading(false);
     }
@@ -63,7 +72,12 @@ export default function Dashboard() {
   }, [query]);
 
   // Pressing Enter / the button searches right away instead of waiting.
-  function handleSearch(e) {
+  // Only searches that found something are worth remembering.
+  function remember(term) {
+    setRecent(addRecentSearch(term));
+  }
+
+  async function handleSearch(e) {
     e.preventDefault();
     const trimmed = query.trim();
 
@@ -74,7 +88,8 @@ export default function Dashboard() {
     }
 
     clearTimeout(timer.current);
-    runSearch(trimmed);
+    const albums = await runSearch(trimmed);
+    if (albums && albums.length) remember(trimmed);
   }
 
   return (
@@ -119,6 +134,41 @@ export default function Dashboard() {
             </button>
           ))}
         </div>
+
+        {recent.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Recent searches">
+            <span className="text-xs uppercase tracking-[0.18em] text-dim/70">Recent</span>
+            {recent.map((item) => (
+              <span
+                key={item}
+                className="inline-flex items-center rounded-full border border-groove bg-surface2 text-xs text-dim transition hover:border-label"
+              >
+                <button
+                  type="button"
+                  onClick={() => setQuery(item)}
+                  className="rounded-l-full py-1 pl-2.5 pr-1.5 hover:text-cream"
+                >
+                  {item}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRecent(removeRecentSearch(item))}
+                  aria-label={`Remove ${item} from recent searches`}
+                  className="rounded-r-full py-1 pl-1 pr-2 hover:text-label"
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+            <button
+              type="button"
+              onClick={() => setRecent(clearRecentSearches())}
+              className="text-xs text-dim underline-offset-2 hover:text-label hover:underline"
+            >
+              Clear
+            </button>
+          </div>
+        )}
       </form>
 
       {loading && <AlbumCardSkeleton count={5} label="Searching the catalog" />}
@@ -137,7 +187,11 @@ export default function Dashboard() {
 
       <div className="mt-5 flex flex-col gap-2">
         {!loading && results.map((album) => (
-          <AlbumCard key={album.id} album={album} />
+          <AlbumCard
+            key={album.id}
+            album={album}
+            onClick={() => remember(query.trim())}
+          />
         ))}
       </div>
     </div>
