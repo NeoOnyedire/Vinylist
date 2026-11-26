@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { api } from '../api';
 import AlbumCard from '../components/AlbumCard';
+import AlbumCardSkeleton from '../components/AlbumCardSkeleton';
 import StatsSummary from '../components/StatsSummary';
 import RatingHistogram from '../components/RatingHistogram';
 import { canvasToBlob, renderTopTenCanvas, shareOrDownloadImage } from '../lib/shareImage';
@@ -197,7 +198,7 @@ export default function Profile() {
       <StatsSummary reviews={reviews} />
       <RatingHistogram reviews={reviews} />
 
-      {loading && <p className="text-dim text-sm">Loading your rankings…</p>}
+      {loading && <AlbumCardSkeleton count={6} withRank label="Loading your rankings" />}
 
       {!loading && reviews.length === 0 && (
         <div className="text-center py-16">
