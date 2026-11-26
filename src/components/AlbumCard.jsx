@@ -1,11 +1,12 @@
 import { Link } from 'react-router-dom';
 import { releaseYear } from '../lib/rankings';
 
-export default function AlbumCard({ album, rank, rating }) {
+export default function AlbumCard({ album, rank, rating, onClick }) {
   const year = releaseYear(album);
   return (
     <Link
       to={`/album/${album.id}`}
+      onClick={onClick}
       className="group flex items-center gap-3 rounded-2xl border border-groove bg-surface/70 p-3 text-left transition hover:-translate-y-0.5 hover:border-label hover:bg-surface sm:gap-4"
     >
       {typeof rank === 'number' && (
