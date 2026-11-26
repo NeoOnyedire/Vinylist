@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api';
 import AlbumCard from '../components/AlbumCard';
 import AlbumCardSkeleton from '../components/AlbumCardSkeleton';
 
 const SAMPLE_SEARCHES = ['Fleetwood Mac', 'Kendrick Lamar', 'Magdalena Bay'];
+const DEBOUNCE_MS = 350;
+const MIN_QUERY_LENGTH = 2;
 
 export default function Dashboard() {
   const [query, setQuery] = useState('');
@@ -12,7 +14,56 @@ export default function Dashboard() {
   const [searched, setSearched] = useState(false);
   const [error, setError] = useState('');
 
-  async function handleSearch(e) {
+  // Every search gets an id; only the newest one may update the screen, so a
+  // slow response for "fleet" can't overwrite the results for "fleetwood mac".
+  const latestSearch = useRef(0);
+  const timer = useRef(null);
+
+  async function runSearch(term) {
+    const id = ++latestSearch.current;
+    setLoading(true);
+    setSearched(true);
+    setError('');
+
+    try {
+      const albums = await api.searchAlbums(term);
+      if (id !== latestSearch.current) return;
+      setResults(albums || []);
+      if (!albums || albums.length === 0) {
+        setError(`No albums found for “${term}”.`);
+      }
+    } catch (err) {
+      if (id !== latestSearch.current) return;
+      console.error(err);
+      setError('Search failed. Please try again in a moment.');
+      setResults([]);
+    } finally {
+      if (id === latestSearch.current) setLoading(false);
+    }
+  }
+
+  // Search as you type, once the input has been still for a moment.
+  useEffect(() => {
+    const trimmed = query.trim();
+
+    if (trimmed.length < MIN_QUERY_LENGTH) {
+      // Too short (or cleared): drop any in-flight search and go back to idle.
+      latestSearch.current += 1;
+      setLoading(false);
+      setError('');
+      if (!trimmed) {
+        setResults([]);
+        setSearched(false);
+      }
+      return undefined;
+    }
+
+    timer.current = setTimeout(() => runSearch(trimmed), DEBOUNCE_MS);
+    return () => clearTimeout(timer.current);
+  }, [query]);
+
+  // Pressing Enter / the button searches right away instead of waiting.
+  function handleSearch(e) {
     e.preventDefault();
     const trimmed = query.trim();
 
@@ -22,23 +73,8 @@ export default function Dashboard() {
       return;
     }
 
-    setLoading(true);
-    setSearched(true);
-    setError('');
-
-    try {
-      const albums = await api.searchAlbums(trimmed);
-      setResults(albums || []);
-      if (!albums || albums.length === 0) {
-        setError(`No albums found for “${trimmed}”.`);
-      }
-    } catch (err) {
-      console.error(err);
-      setError('Search failed. Please try again in a moment.');
-      setResults([]);
-    } finally {
-      setLoading(false);
-    }
+    clearTimeout(timer.current);
+    runSearch(trimmed);
   }
 
   return (
@@ -95,7 +131,7 @@ export default function Dashboard() {
 
       {!loading && !searched && !error && (
         <div className="rounded-2xl border border-dashed border-groove bg-surface/40 p-5 text-sm text-dim">
-          Start by searching for an artist or album title to build your collection.
+          Start typing an artist or album title to build your collection.
         </div>
       )}
 
