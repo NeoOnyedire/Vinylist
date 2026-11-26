@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { api } from '../api';
 import AlbumCard from '../components/AlbumCard';
+import AlbumCardSkeleton from '../components/AlbumCardSkeleton';
 
 const SAMPLE_SEARCHES = ['Fleetwood Mac', 'Kendrick Lamar', 'Magdalena Bay'];
 
@@ -84,11 +85,7 @@ export default function Dashboard() {
         </div>
       </form>
 
-      {loading && (
-        <div className="rounded-2xl border border-groove bg-surface/60 p-4 text-sm text-dim">
-          Searching the catalog…
-        </div>
-      )}
+      {loading && <AlbumCardSkeleton count={5} label="Searching the catalog" />}
 
       {!loading && error && (
         <div className="rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">
@@ -103,7 +100,7 @@ export default function Dashboard() {
       )}
 
       <div className="mt-5 flex flex-col gap-2">
-        {results.map((album) => (
+        {!loading && results.map((album) => (
           <AlbumCard key={album.id} album={album} />
         ))}
       </div>
