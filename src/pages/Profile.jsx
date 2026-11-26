@@ -4,6 +4,7 @@ import { api } from '../api';
 import AlbumCard from '../components/AlbumCard';
 import StatsSummary from '../components/StatsSummary';
 import RatingHistogram from '../components/RatingHistogram';
+import { canvasToBlob, renderTopTenCanvas, shareOrDownloadImage } from '../lib/shareImage';
 import { buildBackup, downloadJson, parseBackup } from '../lib/backup';
 import { downloadCsv, rankingsToCsv } from '../lib/exportCsv';
 import { DEFAULT_SORT, SORT_OPTIONS, filterAndSortReviews, groupByDecade } from '../lib/rankings';
@@ -13,6 +14,7 @@ export default function Profile() {
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [sharing, setSharing] = useState(false);
   const [notice, setNotice] = useState(null); // { kind: 'ok' | 'error', text }
   const fileInputRef = useRef(null);
   // Filter, sort and grouping live in the URL (?q=&sort=&group=decade) so a
@@ -66,6 +68,22 @@ export default function Profile() {
     const date = new Date().toISOString().slice(0, 10);
     downloadJson(`vinylist-backup-${date}.json`, buildBackup(reviews));
     setNotice({ kind: 'ok', text: `Saved a backup of ${reviews.length} ranking${reviews.length === 1 ? '' : 's'}.` });
+  }
+
+  async function handleShareImage() {
+    setSharing(true);
+    setNotice(null);
+    try {
+      const ranked = [...reviews].sort((a, b) => a.rank - b.rank);
+      const canvas = await renderTopTenCanvas({ reviews: ranked, displayName: user && user.display_name });
+      const blob = await canvasToBlob(canvas);
+      const outcome = await shareOrDownloadImage(blob, 'vinylist-top-10.png');
+      if (outcome === 'downloaded') setNotice({ kind: 'ok', text: 'Saved your top 10 image.' });
+    } catch (err) {
+      setNotice({ kind: 'error', text: err.message || 'Could not create the image.' });
+    } finally {
+      setSharing(false);
+    }
   }
 
   async function handleImportFile(e) {
@@ -127,6 +145,14 @@ export default function Profile() {
           <div className="ml-auto flex flex-wrap justify-end gap-1.5">
             {reviews.length > 0 && (
               <>
+                <button
+                  type="button"
+                  onClick={handleShareImage}
+                  disabled={sharing}
+                  className="rounded-full border border-groove bg-surface/80 px-3 py-1.5 text-xs font-medium text-dim transition hover:border-label hover:text-cream disabled:opacity-60 sm:text-sm"
+                >
+                  {sharing ? 'Creating…' : 'Share top 10'}
+                </button>
                 <button type="button" onClick={handleExportCsv} className="rounded-full border border-groove bg-surface/80 px-3 py-1.5 text-xs font-medium text-dim transition hover:border-label hover:text-cream disabled:opacity-60 sm:text-sm">
                   Export CSV
                 </button>
